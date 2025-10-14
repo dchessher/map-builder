@@ -1,4 +1,4 @@
-import React, { useId, useMemo } from 'react';
+import React, { forwardRef, useId, useMemo } from 'react';
 import type { Tile } from '../mapGenerator';
 
 interface MapGridProps {
@@ -47,7 +47,7 @@ function buildHexPoints(cx: number, cy: number, size: number): string {
   }).join(' ');
 }
 
-export const MapGrid: React.FC<MapGridProps> = ({ map }) => {
+export const MapGrid = forwardRef<SVGSVGElement, MapGridProps>(({ map }, ref) => {
   const titleId = useId();
   const descriptionId = useId();
 
@@ -116,6 +116,7 @@ export const MapGrid: React.FC<MapGridProps> = ({ map }) => {
           role="img"
           aria-labelledby={`${titleId} ${descriptionId}`}
           preserveAspectRatio="xMidYMid meet"
+          ref={ref}
         >
           <title id={titleId}>Generated terrain map</title>
           <desc id={descriptionId}>
@@ -151,6 +152,8 @@ export const MapGrid: React.FC<MapGridProps> = ({ map }) => {
       </div>
     </div>
   );
-};
+});
+
+MapGrid.displayName = 'MapGrid';
 
 export default MapGrid;
