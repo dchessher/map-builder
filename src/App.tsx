@@ -24,6 +24,7 @@ const App: React.FC = () => {
   const [isDownloading, setIsDownloading] = useState(false);
   const mapSvgRef = useRef<SVGSVGElement | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isThreeD, setIsThreeD] = useState(false);
 
   const weightEntries = useMemo(
     () => Object.entries(weights) as Array<[TileType, number]>,
@@ -47,6 +48,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (!isFullscreen) {
+      setIsThreeD(false);
       return undefined;
     }
 
@@ -116,9 +118,32 @@ const App: React.FC = () => {
     const styleElement = document.createElementNS('http://www.w3.org/2000/svg', 'style');
     styleElement.textContent = `
       :root { ${variableDeclarations} }
+      .map-svg--3d {
+        transform-origin: 50% 50%;
+        transform: perspective(1400px) rotateX(55deg);
+      }
+      .map-hex-base {
+        fill-opacity: 0.65;
+        stroke: rgba(6, 26, 18, 0.75);
+        stroke-width: 0.04;
+      }
+      .map-hex-side {
+        stroke: rgba(6, 26, 18, 0.8);
+        stroke-width: 0.04;
+        fill-opacity: 0.82;
+        transition: filter 0.2s ease, stroke 0.2s ease;
+      }
+      .map-hex-group--3d:hover .map-hex-side {
+        filter: brightness(1.12);
+        stroke: rgba(34, 197, 94, 0.5);
+      }
       .map-hex {
         stroke: rgba(6, 26, 18, 0.85);
         stroke-width: 0.04;
+        transition: filter 0.2s ease, stroke 0.2s ease;
+      }
+      .map-hex--top {
+        filter: drop-shadow(0 0.08px 0.16px rgba(0, 0, 0, 0.45));
       }
       .map-hex-label {
         fill: rgba(0, 0, 0, 0.55);
@@ -386,6 +411,16 @@ const App: React.FC = () => {
             >
               Default size
             </button>
+            {isFullscreen ? (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setIsThreeD((previous) => !previous)}
+                aria-pressed={isThreeD}
+              >
+                {isThreeD ? 'Top-down view' : '3D view'}
+              </button>
+            ) : null}
             <button
               type="button"
               className="primary-button"
@@ -396,7 +431,12 @@ const App: React.FC = () => {
             </button>
           </div>
         </div>
-        <MapGrid ref={mapSvgRef} map={map} showDetailedLabels={isFullscreen} />
+        <MapGrid
+          ref={mapSvgRef}
+          map={map}
+          showDetailedLabels={isFullscreen}
+          showThreeD={isFullscreen && isThreeD}
+        />
       </section>
     </div>
   );
