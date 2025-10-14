@@ -11,7 +11,8 @@
     "jsx": "react-jsx",
     "strict": true,
     "noEmit": true,
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    "typeRoots": ["./types", "./node_modules/@types", "./node_modules"]
   },
   "include": ["src"],
   "references": [{ "path": "./tsconfig.node.json" }]

@@ -1,4 +1,11 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, {
+  ChangeEvent,
+  FormEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import MapGrid from './components/MapGrid';
 import {
   DEFAULT_TERRAIN_WEIGHTS,
@@ -16,6 +23,8 @@ const App: React.FC = () => {
   const [downloadFormat, setDownloadFormat] = useState<'png' | 'json'>('png');
   const [isDownloading, setIsDownloading] = useState(false);
   const mapSvgRef = useRef<SVGSVGElement | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isThreeD, setIsThreeD] = useState(false);
 
   const weightEntries = useMemo(
     () => Object.entries(weights) as Array<[TileType, number]>,
@@ -36,6 +45,20 @@ const App: React.FC = () => {
   );
 
   const map = useMemo(() => generateMap(seed, { weights }), [seed, weights]);
+
+  useEffect(() => {
+    if (!isFullscreen) {
+      setIsThreeD(false);
+      return undefined;
+    }
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isFullscreen]);
 
   const fileBaseName = useMemo(() => {
     const trimmed = seed.trim();
@@ -95,9 +118,32 @@ const App: React.FC = () => {
     const styleElement = document.createElementNS('http://www.w3.org/2000/svg', 'style');
     styleElement.textContent = `
       :root { ${variableDeclarations} }
+      .map-svg--3d {
+        transform-origin: 50% 50%;
+        transform: perspective(1400px) rotateX(55deg);
+      }
+      .map-hex-base {
+        fill-opacity: 0.65;
+        stroke: rgba(6, 26, 18, 0.75);
+        stroke-width: 0.04;
+      }
+      .map-hex-side {
+        stroke: rgba(6, 26, 18, 0.8);
+        stroke-width: 0.04;
+        fill-opacity: 0.82;
+        transition: filter 0.2s ease, stroke 0.2s ease;
+      }
+      .map-hex-group--3d:hover .map-hex-side {
+        filter: brightness(1.12);
+        stroke: rgba(34, 197, 94, 0.5);
+      }
       .map-hex {
         stroke: rgba(6, 26, 18, 0.85);
         stroke-width: 0.04;
+        transition: filter 0.2s ease, stroke 0.2s ease;
+      }
+      .map-hex--top {
+        filter: drop-shadow(0 0.08px 0.16px rgba(0, 0, 0, 0.45));
       }
       .map-hex-label {
         fill: rgba(0, 0, 0, 0.55);
@@ -114,6 +160,17 @@ const App: React.FC = () => {
       .map-hex-group:hover .map-hex {
         filter: brightness(1.1);
         stroke: rgba(34, 197, 94, 0.5);
+      }
+      .map-hex-detail {
+        fill: rgba(236, 253, 245, 0.95);
+        font-size: 0.32px;
+        font-weight: 600;
+        text-anchor: middle;
+        dominant-baseline: middle;
+        pointer-events: none;
+        paint-order: stroke;
+        stroke: rgba(4, 12, 8, 0.65);
+        stroke-width: 0.03;
       }
     `;
 
@@ -229,14 +286,14 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="app">
+    <div className={`app${isFullscreen ? ' app--fullscreen-active' : ''}`}>
       <header className="app-header">
         <h1>Seeded Map Builder</h1>
         <p>Enter a seed to generate a repeatable random map.</p>
       </header>
       <form
         className="seed-form"
-        onSubmit={(event) => {
+        onSubmit={(event: FormEvent<HTMLFormElement>) => {
           event.preventDefault();
           setSeed(seedInput);
         }}
@@ -249,7 +306,7 @@ const App: React.FC = () => {
           name="seed"
           type="text"
           value={seedInput}
-          onChange={(event) => setSeedInput(event.target.value)}
+          onChange={(event: ChangeEvent<HTMLInputElement>) => setSeedInput(event.target.value)}
           placeholder="Type a seed value"
           className="seed-input"
         />
@@ -305,7 +362,9 @@ const App: React.FC = () => {
                   max={100}
                   step={1}
                   value={value}
-                  onChange={(event) => handleWeightChange(type, Number(event.target.value))}
+                  onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                    handleWeightChange(type, Number(event.target.value))
+                  }
                   aria-valuemin={0}
                   aria-valuemax={100}
                   aria-valuenow={value}
@@ -316,30 +375,68 @@ const App: React.FC = () => {
           })}
         </div>
       </section>
-      <section className="map-section" aria-live="polite">
+      <section
+        className={`map-section${isFullscreen ? ' map-section--fullscreen' : ''}`}
+        aria-live="polite"
+      >
         <div className="map-toolbar" role="group" aria-label="Map export controls">
           <div className="format-select">
             <label htmlFor="download-format">Download format</label>
             <select
               id="download-format"
               value={downloadFormat}
-              onChange={(event) => setDownloadFormat(event.target.value as 'png' | 'json')}
+              onChange={(event: ChangeEvent<HTMLSelectElement>) =>
+                setDownloadFormat(event.target.value as 'png' | 'json')
+              }
               disabled={isDownloading}
             >
               <option value="png">PNG image</option>
               <option value="json">JSON data</option>
             </select>
           </div>
-          <button
-            type="button"
-            className="primary-button"
-            onClick={handleDownload}
-            disabled={isDownloading}
-          >
-            {isDownloading ? 'Preparing…' : 'Download map'}
-          </button>
+          <div className="map-toolbar-buttons">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => setIsFullscreen(true)}
+              disabled={isFullscreen}
+            >
+              Fullscreen map
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => setIsFullscreen(false)}
+              disabled={!isFullscreen}
+            >
+              Default size
+            </button>
+            {isFullscreen ? (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setIsThreeD((previous) => !previous)}
+                aria-pressed={isThreeD}
+              >
+                {isThreeD ? 'Top-down view' : '3D view'}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="primary-button"
+              onClick={handleDownload}
+              disabled={isDownloading}
+            >
+              {isDownloading ? 'Preparing…' : 'Download map'}
+            </button>
+          </div>
         </div>
-        <MapGrid ref={mapSvgRef} map={map} />
+        <MapGrid
+          ref={mapSvgRef}
+          map={map}
+          showDetailedLabels={isFullscreen}
+          showThreeD={isFullscreen && isThreeD}
+        />
       </section>
     </div>
   );
