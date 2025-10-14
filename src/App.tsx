@@ -71,6 +71,57 @@ const App: React.FC = () => {
     document.body.removeChild(link);
   };
 
+  const prepareSvgForExport = (svg: SVGSVGElement) => {
+    const clonedSvg = svg.cloneNode(true) as SVGSVGElement;
+    clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+    const rootStyles = getComputedStyle(document.documentElement);
+    const colorVariables = [
+      '--color-water',
+      '--color-sand',
+      '--color-grass',
+      '--color-forest',
+      '--color-mountain',
+    ];
+
+    const variableDeclarations = colorVariables
+      .map((variable) => {
+        const value = rootStyles.getPropertyValue(variable).trim();
+        return value ? `${variable}: ${value};` : '';
+      })
+      .filter(Boolean)
+      .join(' ');
+
+    const styleElement = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+    styleElement.textContent = `
+      :root { ${variableDeclarations} }
+      .map-hex {
+        stroke: rgba(6, 26, 18, 0.85);
+        stroke-width: 0.04;
+      }
+      .map-hex-label {
+        fill: rgba(0, 0, 0, 0.55);
+        font-size: 0.35px;
+        font-weight: 600;
+        text-anchor: middle;
+        dominant-baseline: middle;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .map-hex-group:hover .map-hex-label {
+        opacity: 1;
+      }
+      .map-hex-group:hover .map-hex {
+        filter: brightness(1.1);
+        stroke: rgba(34, 197, 94, 0.5);
+      }
+    `;
+
+    clonedSvg.insertBefore(styleElement, clonedSvg.firstChild);
+
+    return clonedSvg;
+  };
+
   const handleDownload = async () => {
     setIsDownloading(true);
 
@@ -106,8 +157,7 @@ const App: React.FC = () => {
         throw new Error('Map preview is not available yet.');
       }
 
-      const clonedSvg = svgElement.cloneNode(true) as SVGSVGElement;
-      clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      const clonedSvg = prepareSvgForExport(svgElement);
       const serializer = new XMLSerializer();
       const svgString = serializer.serializeToString(clonedSvg);
       const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
