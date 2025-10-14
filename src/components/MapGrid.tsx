@@ -26,28 +26,28 @@ function formatElevation(elevation: number): string {
 }
 
 export const MapGrid: React.FC<MapGridProps> = ({ map }) => {
-  const width = map[0]?.length ?? 0;
-
   return (
     <div className="map-container">
-      <div
-        className="map-grid"
-        style={{
-          gridTemplateColumns: `repeat(${width}, minmax(0, 1fr))`,
-        }}
-      >
-        {map.flatMap((row, y) =>
-          row.map((tile, x) => (
-            <div
-              key={`${x}-${y}`}
-              className="map-tile"
-              style={{ backgroundColor: tileColors[tile.type] }}
-              aria-label={`${typeLabels[tile.type]} tile with elevation ${formatElevation(tile.elevation)}`}
-            >
-              <span className="tile-elevation">{formatElevation(tile.elevation)}</span>
-            </div>
-          )),
-        )}
+      <div className="map-grid">
+        {map.map((row, y) => (
+          <div
+            key={y}
+            className={`map-row${y % 2 === 1 ? ' offset' : ''}`}
+            role="row"
+            aria-label={`Row ${y + 1}`}
+          >
+            {row.map((tile, x) => (
+              <div
+                key={`${x}-${y}`}
+                className="map-tile"
+                style={{ backgroundColor: tileColors[tile.type] }}
+                aria-label={`${typeLabels[tile.type]} tile with elevation ${formatElevation(tile.elevation)}`}
+              >
+                <span className="tile-elevation">{formatElevation(tile.elevation)}</span>
+              </div>
+            ))}
+          </div>
+        ))}
       </div>
       <div className="map-legend" aria-label="Map legend">
         {Object.entries(tileColors).map(([type, color]) => (
