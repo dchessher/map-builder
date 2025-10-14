@@ -119,19 +119,29 @@ const App: React.FC = () => {
     styleElement.textContent = `
       :root { ${variableDeclarations} }
       .map-svg--3d {
-        transform-origin: 50% 50%;
-        transform: perspective(1400px) rotateX(55deg);
+        transform-origin: 50% 72%;
+        transform: translateY(-10%) scale(0.88) rotateX(58deg);
       }
       .map-hex-base {
-        fill-opacity: 0.65;
-        stroke: rgba(6, 26, 18, 0.75);
+        fill-opacity: 0.75;
+        stroke: rgba(6, 26, 18, 0.82);
         stroke-width: 0.04;
+        filter: brightness(0.65);
       }
       .map-hex-side {
         stroke: rgba(6, 26, 18, 0.8);
         stroke-width: 0.04;
         fill-opacity: 0.82;
         transition: filter 0.2s ease, stroke 0.2s ease;
+      }
+      .map-hex-side--front {
+        filter: brightness(0.58);
+      }
+      .map-hex-side--mid {
+        filter: brightness(0.72);
+      }
+      .map-hex-side--back {
+        filter: brightness(0.88);
       }
       .map-hex-group--3d:hover .map-hex-side {
         filter: brightness(1.12);

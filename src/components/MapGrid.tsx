@@ -26,7 +26,9 @@ const typeLabels: Record<Tile['type'], string> = {
 const SQRT3 = Math.sqrt(3);
 const HEX_SIZE = 1;
 const HALF_SQRT3 = (SQRT3 / 2) * HEX_SIZE;
-const EXTRUSION_SCALE = 1.35;
+const EXTRUSION_MIN = HEX_SIZE * 0.35;
+const EXTRUSION_RANGE = HEX_SIZE * 5.75;
+const PLATFORM_DEPTH = HEX_SIZE * 0.85;
 
 interface Vertex {
   x: number;
@@ -87,22 +89,27 @@ export const MapGrid = forwardRef<SVGSVGElement, MapGridProps>(
       for (let row = 0; row < map.length; row += 1) {
         const offset = row % 2 === 1 ? horizontalStep / 2 : 0;
         for (let column = 0; column < map[row].length; column += 1) {
-          const centerX = horizontalStep * column + offset;
-          const centerY = verticalStep * row;
+          const groundCenterX = horizontalStep * column + offset;
+          const groundCenterY = verticalStep * row;
           const tile = map[row][column];
-          const extrusionHeight = showThreeD ? tile.elevation * EXTRUSION_SCALE : 0;
+          const normalizedElevation = Math.max(tile.elevation, 0.04);
+          const extrusionHeight = showThreeD
+            ? EXTRUSION_MIN + normalizedElevation * EXTRUSION_RANGE
+            : 0;
+          const topCenterY = showThreeD ? groundCenterY - extrusionHeight : groundCenterY;
 
-          minX = Math.min(minX, centerX - HALF_SQRT3);
-          maxX = Math.max(maxX, centerX + HALF_SQRT3);
-          minY = Math.min(minY, centerY - HEX_SIZE);
-          maxY = Math.max(maxY, centerY + HEX_SIZE + extrusionHeight);
+          minX = Math.min(minX, groundCenterX - HALF_SQRT3);
+          maxX = Math.max(maxX, groundCenterX + HALF_SQRT3);
+          minY = Math.min(minY, topCenterY - HEX_SIZE);
+          const depthWithPlatform = showThreeD ? extrusionHeight + PLATFORM_DEPTH : 0;
+          maxY = Math.max(maxY, topCenterY + HEX_SIZE + depthWithPlatform);
 
           cells.push({
             tile,
             column,
             row,
-            centerX,
-            centerY,
+            centerX: groundCenterX,
+            centerY: topCenterY,
             points: '',
             vertices: [],
             extrusionHeight,
@@ -113,6 +120,15 @@ export const MapGrid = forwardRef<SVGSVGElement, MapGridProps>(
       if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
         return { cells: [] as HexCell[], viewBox: '0 0 1 1' };
       }
+
+      const horizontalPadding = showThreeD ? HEX_SIZE * 3.4 : HEX_SIZE * 0.6;
+      const topPadding = showThreeD ? HEX_SIZE * 3.2 : HEX_SIZE * 0.6;
+      const bottomPadding = showThreeD ? HEX_SIZE * 6.2 : HEX_SIZE * 0.6;
+
+      minX -= horizontalPadding;
+      maxX += horizontalPadding;
+      minY -= topPadding;
+      maxY += bottomPadding;
 
       const width = maxX - minX;
       const height = maxY - minY;
@@ -185,9 +201,10 @@ export const MapGrid = forwardRef<SVGSVGElement, MapGridProps>(
                 );
               }
 
+              const baseDepth = showThreeD ? cell.extrusionHeight + PLATFORM_DEPTH : 0;
               const bottomVertices = cell.vertices.map((vertex) => ({
                 x: vertex.x,
-                y: vertex.y + cell.extrusionHeight,
+                y: vertex.y + baseDepth,
               }));
               const bottomPoints = bottomVertices
                 .map((vertex) => `${vertex.x.toFixed(4)},${vertex.y.toFixed(4)}`)
@@ -198,8 +215,24 @@ export const MapGrid = forwardRef<SVGSVGElement, MapGridProps>(
                 const nextVertex = cell.vertices[nextIndex];
                 const bottomVertex = bottomVertices[index];
                 const nextBottomVertex = bottomVertices[nextIndex];
+                const faceCenterY =
+                  (vertex.y + nextVertex.y + bottomVertex.y + nextBottomVertex.y) / 4;
+                const frontThreshold = cell.centerY + baseDepth * 0.65;
+                const backThreshold = cell.centerY + baseDepth * 0.2;
+                let shade: 'front' | 'mid' | 'back';
 
-                return `M${vertex.x.toFixed(4)},${vertex.y.toFixed(4)} L${nextVertex.x.toFixed(4)},${nextVertex.y.toFixed(4)} L${nextBottomVertex.x.toFixed(4)},${nextBottomVertex.y.toFixed(4)} L${bottomVertex.x.toFixed(4)},${bottomVertex.y.toFixed(4)} Z`;
+                if (faceCenterY >= frontThreshold) {
+                  shade = 'front';
+                } else if (faceCenterY <= backThreshold) {
+                  shade = 'back';
+                } else {
+                  shade = 'mid';
+                }
+
+                return {
+                  path: `M${vertex.x.toFixed(4)},${vertex.y.toFixed(4)} L${nextVertex.x.toFixed(4)},${nextVertex.y.toFixed(4)} L${nextBottomVertex.x.toFixed(4)},${nextBottomVertex.y.toFixed(4)} L${bottomVertex.x.toFixed(4)},${bottomVertex.y.toFixed(4)} Z`,
+                  shade,
+                };
               });
 
               return (
@@ -212,11 +245,11 @@ export const MapGrid = forwardRef<SVGSVGElement, MapGridProps>(
                     points={bottomPoints}
                     fill={tileColors[cell.tile.type]}
                   />
-                  {sidePolygons.map((path, index) => (
+                  {sidePolygons.map((polygon, index) => (
                     <path
                       key={`side-${index}`}
-                      className="map-hex-side"
-                      d={path}
+                      className={`map-hex-side map-hex-side--${polygon.shade}`}
+                      d={polygon.path}
                       fill={tileColors[cell.tile.type]}
                     />
                   ))}
