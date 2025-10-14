@@ -1,5 +1,7 @@
 export type TileType = 'water' | 'sand' | 'grass' | 'forest' | 'mountain';
 
+export type TerrainWeights = Record<TileType, number>;
+
 export interface Tile {
   type: TileType;
   elevation: number;
@@ -7,6 +9,14 @@ export interface Tile {
 
 const DEFAULT_WIDTH = 40;
 const DEFAULT_HEIGHT = 24;
+
+export const DEFAULT_TERRAIN_WEIGHTS: TerrainWeights = {
+  water: 25,
+  sand: 10,
+  grass: 30,
+  forest: 20,
+  mountain: 15,
+};
 
 function xmur3(str: string): () => number {
   let h = 1779033703 ^ str.length;
@@ -49,6 +59,34 @@ function layeredNoise(x: number, y: number, base: number): number {
 export interface GenerateMapOptions {
   width?: number;
   height?: number;
+  weights?: TerrainWeights;
+}
+
+function normaliseWeights(weights: TerrainWeights | undefined): TerrainWeights {
+  if (!weights) {
+    return { ...DEFAULT_TERRAIN_WEIGHTS };
+  }
+
+  const entries = Object.entries(weights) as [TileType, number][];
+  const total = entries.reduce((sum, [, value]) => sum + Math.max(value, 0), 0);
+
+  if (total <= 0) {
+    return { ...DEFAULT_TERRAIN_WEIGHTS };
+  }
+
+  const normalised: TerrainWeights = {
+    water: 0,
+    sand: 0,
+    grass: 0,
+    forest: 0,
+    mountain: 0,
+  };
+
+  entries.forEach(([type, value]) => {
+    normalised[type] = Math.max(value, 0) / total;
+  });
+
+  return normalised;
 }
 
 export function generateMap(seed: string, options: GenerateMapOptions = {}): Tile[][] {
@@ -58,23 +96,26 @@ export function generateMap(seed: string, options: GenerateMapOptions = {}): Til
 
   const seedFn = xmur3(baseSeed.toLowerCase());
   const base = seedFn();
+  const weights = normaliseWeights(options.weights);
+  const cumulativeThresholds: Array<{ type: TileType; threshold: number }> = [];
+  let cumulative = 0;
+  (['water', 'sand', 'grass', 'forest', 'mountain'] as TileType[]).forEach((type) => {
+    cumulative += weights[type];
+    cumulativeThresholds.push({ type, threshold: cumulative });
+  });
+
   const map: Tile[][] = [];
 
   for (let y = 0; y < height; y += 1) {
     const row: Tile[] = [];
     for (let x = 0; x < width; x += 1) {
       const elevation = layeredNoise(x, y, base);
-      let type: TileType;
-      if (elevation < 0.25) {
-        type = 'water';
-      } else if (elevation < 0.35) {
-        type = 'sand';
-      } else if (elevation < 0.65) {
-        type = 'grass';
-      } else if (elevation < 0.85) {
-        type = 'forest';
-      } else {
-        type = 'mountain';
+      let type: TileType = 'mountain';
+      for (let index = 0; index < cumulativeThresholds.length; index += 1) {
+        if (elevation < cumulativeThresholds[index].threshold) {
+          type = cumulativeThresholds[index].type;
+          break;
+        }
       }
       row.push({ type, elevation });
     }
